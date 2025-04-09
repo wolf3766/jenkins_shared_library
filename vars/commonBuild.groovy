@@ -3,60 +3,66 @@ def call(Map config = [:]) {
         agent any
 
         environment {
-            BRANCH_NAME = "${config.branch ?: 'main'}"
-            REPO_URL = "${config.URL}"
-            IMAGE_NAME = "${config.image_name}"
+            IMAGE_NAME = config.image_name ?: 'yourdockeruser/yourimage'
+            TAG = config.tag ?: 'latest'
+            DOCKER_USER = credentials(config.docker_credentials_id).username
+            DOCKER_PASS = credentials(config.docker_credentials_id).password
+            GIT_URL = config.git_url ?: 'https://github.com/wolf3766/java_application'
+            GIT_BRANCH = config.git_branch ?: 'main'
         }
 
         stages {
             stage('Checkout') {
                 steps {
-                    echo "Checking out branch: ${env.BRANCH_NAME} from ${env.REPO_URL}"
-                    git branch: "${env.BRANCH_NAME}", url: "${env.REPO_URL}"
+                    git url: "${env.GIT_URL}", branch: "${env.GIT_BRANCH}"
                 }
             }
 
-            stage('Unit Tests') {
+            stage('Build and Test') {
                 steps {
-                    echo "Running unit test cases"
-                    // Add actual test script here, e.g.:
-                    // sh './gradlew test'
+                    sh 'mvn clean install'
                 }
             }
 
-            stage('Build and Push Docker Image') {
+            stage('Build Docker Image') {
                 steps {
-                    echo "Building and pushing Docker image: ${env.IMAGE_NAME}"
+                    sh "docker build -t ${env.IMAGE_NAME}:${env.TAG} ."
+                }
+            }
 
+            stage('Login & Push Docker Image') {
+                steps {
                     withCredentials([usernamePassword(
-                        credentialsId: 'docker',
+                        credentialsId: config.docker_credentials_id,
                         usernameVariable: 'DOCKER_USER',
                         passwordVariable: 'DOCKER_PASS'
                     )]) {
                         sh '''
                             echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                            docker build -t $IMAGE_NAME .
-                            docker push $IMAGE_NAME
+                            docker push $IMAGE_NAME:$TAG
                             docker logout
                         '''
                     }
                 }
             }
 
-            stage('Deploy') {
+            stage('Deploy to Kubernetes') {
                 steps {
-                    echo "Deploying to Kubernetes"
-                    sh 'kubectl apply -f deployment.yaml'
+                    sh '''
+                        kubectl delete deployment --all || true
+                        kubectl create deployment hello1springboot --image=$IMAGE_NAME:$TAG --dry-run=client -o yaml > deploy.yaml
+                        kubectl apply -f deploy.yaml
+                    '''
                 }
             }
         }
 
         post {
             success {
-                echo "Pipeline executed successfully!"
+                echo "✅ Deployment succeeded!"
             }
             failure {
-                echo "Pipeline failed."
+                echo "❌ Deployment failed."
             }
         }
     }
