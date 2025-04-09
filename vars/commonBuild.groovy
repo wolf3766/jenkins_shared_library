@@ -3,7 +3,7 @@ def call(Map config = [:]) {
         agent any
 
         environment {
-            IMAGE_NAME = 'default'   // Placeholder, overridden later
+            IMAGE_NAME = 'default' 
             TAG = 'latest'
             GIT_URL = 'https://github.com/wolf3766/java_application'
             GIT_BRANCH = 'master'
@@ -46,7 +46,7 @@ def call(Map config = [:]) {
                         usernameVariable: 'DOCKER_USER',
                         passwordVariable: 'DOCKER_PASS'
                     )]) {
-                        sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                        sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER -p $DOCKER_PASS"
                         sh "docker push ${env.IMAGE_NAME}:${env.TAG}"
                     }
                 }
