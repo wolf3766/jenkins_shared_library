@@ -3,12 +3,12 @@ def call(Map config = [:]) {
         agent any
 
         environment {
-            IMAGE_NAME = config.image_name ?: 'yourdockeruser/yourimage'
+            IMAGE_NAME = config.image_name ?: 'skc3766/python_image'
             TAG = config.tag ?: 'latest'
             DOCKER_USER = credentials(config.docker_credentials_id).username
             DOCKER_PASS = credentials(config.docker_credentials_id).password
             GIT_URL = config.git_url ?: 'https://github.com/wolf3766/java_application'
-            GIT_BRANCH = config.git_branch ?: 'main'
+            GIT_BRANCH = config.git_branch ?: 'master'
         }
 
         stages {
@@ -37,22 +37,17 @@ def call(Map config = [:]) {
                         usernameVariable: 'DOCKER_USER',
                         passwordVariable: 'DOCKER_PASS'
                     )]) {
-                        sh '''
-                            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                            docker push $IMAGE_NAME:$TAG
-                            docker logout
-                        '''
+     			    sh "docker login -u $DOCKER_USER -p $DOCKER_PASS"
+                            sh "docker push ${env.IMAGE_NAME}:$TAG"
                     }
                 }
             }
 
             stage('Deploy to Kubernetes') {
                 steps {
-                    sh '''
-                        kubectl delete deployment --all || true
-                        kubectl create deployment hello1springboot --image=$IMAGE_NAME:$TAG --dry-run=client -o yaml > deploy.yaml
-                        kubectl apply -f deploy.yaml
-                    '''
+                       sh "kubectl delete deployment --all"
+                       sh "kubectl create deployment hello1springboot --image=$IMAGE_NAME:$TAG --dry-run=client -o yaml > deploy.yaml"
+                       sh "kubectl apply -f deploy.yaml"
                 }
             }
         }
